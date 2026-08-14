@@ -1,0 +1,233 @@
+generator client {
+  provider        = "prisma-client-js"
+  // Explicit binary targets so the client works both on the host (dev/tests)
+  // and inside the node:22-alpine container (musl + OpenSSL 3).
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum ProjectStatus {
+  PLANNED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+enum RiskStatus {
+  OPEN
+  MITIGATED
+  CLOSED
+  ACCEPTED
+}
+
+enum DependencyType {
+  FINISH_TO_START
+}
+
+enum StakeholderRole {
+  RESPONSIBLE
+  ACCOUNTABLE
+  CONSULTED
+  INFORMED
+}
+
+// ---------------------------------------------------------------------------
+// Users (minimal, only for JWT authentication)
+// ---------------------------------------------------------------------------
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Projects
+// ---------------------------------------------------------------------------
+
+model Project {
+  id                Int           @id @default(autoincrement())
+  projectCode       String        @unique
+  name              String
+  description       String?
+  plannedStartDate  DateTime
+  plannedEndDate    DateTime
+  actualStartDate   DateTime?
+  actualEndDate     DateTime?
+  status            ProjectStatus @default(PLANNED)
+  progressPercentage Float        @default(0)
+  nextTaskNumber    Int           @default(1)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  tasks        Task[]
+  risks        Risk[]
+  stakeholders ProjectStakeholder[]
+
+  @@index([status])
+  @@index([plannedStartDate])
+  @@index([plannedEndDate])
+}
+
+// ---------------------------------------------------------------------------
+// Tasks
+// ---------------------------------------------------------------------------
+
+model Task {
+  id                Int        @id @default(autoincrement())
+  projectId         Int
+  taskCode          String
+  name              String
+  description       String?
+  priorityId        Int
+  plannedStartDate  DateTime
+  plannedEndDate    DateTime
+  actualStartDate   DateTime?
+  actualEndDate     DateTime?
+  dueDate           DateTime
+  status            TaskStatus @default(TODO)
+  progressPercentage Float     @default(0)
+  sortOrder         Int        @default(0)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  project      Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  priority     Priority           @relation(fields: [priorityId], references: [id], onDelete: Restrict)
+  stakeholders TaskStakeholder[]
+  dependencies TaskDependency[]   @relation("TaskDependencies")
+  dependents   TaskDependency[]   @relation("TaskDependents")
+
+  @@unique([projectId, taskCode])
+  @@index([projectId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([priorityId])
+  @@index([plannedStartDate])
+  @@index([plannedEndDate])
+}
+
+model TaskDependency {
+  id              Int            @id @default(autoincrement())
+  taskId          Int // task that depends on `dependsOnTaskId`
+  dependsOnTaskId Int // task that must finish first
+  dependencyType  DependencyType @default(FINISH_TO_START)
+
+  task      Task @relation("TaskDependencies", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn Task @relation("TaskDependents", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnTaskId])
+  @@index([taskId])
+  @@index([dependsOnTaskId])
+}
+
+model TaskStakeholder {
+  id            Int             @id @default(autoincrement())
+  taskId        Int
+  stakeholderId Int
+  role          StakeholderRole @default(RESPONSIBLE)
+
+  task         Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  stakeholder  Stakeholder  @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, stakeholderId])
+  @@index([taskId])
+  @@index([stakeholderId])
+}
+
+// ---------------------------------------------------------------------------
+// Stakeholders
+// ---------------------------------------------------------------------------
+
+model Stakeholder {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  phone        String?
+  department   String?
+  position     String?
+  organization String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  projects ProjectStakeholder[]
+  tasks    TaskStakeholder[]
+  risks    Risk[]
+}
+
+model ProjectStakeholder {
+  id            Int @id @default(autoincrement())
+  projectId     Int
+  stakeholderId Int
+
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stakeholder Stakeholder @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, stakeholderId])
+  @@index([projectId])
+  @@index([stakeholderId])
+}
+
+// ---------------------------------------------------------------------------
+// Priorities (configurable, not hard-coded)
+// ---------------------------------------------------------------------------
+
+model Priority {
+  id          Int    @id @default(autoincrement())
+  name        String @unique
+  level       Int    @unique
+  description String?
+  color       String?
+
+  tasks Task[]
+
+  @@index([level])
+}
+
+// ---------------------------------------------------------------------------
+// Risks
+// ---------------------------------------------------------------------------
+
+model Risk {
+  id                 Int        @id @default(autoincrement())
+  projectId          Int
+  title              String
+  description        String?
+  probability        Int // 1 (Very Low) .. 5 (Very High)
+  impact             Int // 1 (Very Low) .. 5 (Very High)
+  riskScore          Int // probability * impact (computed in the service layer)
+  mitigationPlan     String?
+  contingencyPlan    String?
+  ownerStakeholderId Int?
+  status             RiskStatus @default(OPEN)
+  identifiedDate     DateTime   @default(now())
+  resolvedDate       DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  project Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner   Stakeholder? @relation(fields: [ownerStakeholderId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([status])
+  @@index([probability, impact])
+}
