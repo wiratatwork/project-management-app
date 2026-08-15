@@ -30,11 +30,18 @@ export default {
         { key: 'taskCount', label: 'Tasks' },
       ],
       fetch: (qs) => api.get(`/api/stakeholders?${qs}`),
+      // Click a row -> Gantt Chart pre-filtered to that person: which
+      // projects/tasks they touch, and which are at-risk / already delayed.
+      onRowClick: (row) => navigate(`gantt?stakeholder=${row.id}`),
       actions: [
         { label: 'Edit', className: 'btn-secondary', onClick: (row) => openEdit(row) },
         { label: 'Delete', className: 'btn-danger', onClick: (row) => remove(row) },
       ],
       emptyText: 'No stakeholders yet.',
+      selectable: true,
+      onBulkDelete: (ids) => removeMany(ids),
+      confirmBulkDelete: (n) =>
+        `Delete ${n} selected stakeholder(s)? Their project/task links will be removed.`,
     });
 
     const openCreate = () => {

@@ -4,6 +4,8 @@ import { toast, loadingHtml } from '../components/ui.js';
 import { taskFormModal } from '../components/forms.js';
 import { renderGantt, snapToBusinessDay } from '../components/GanttChart.js';
 import { selectHTML, mountSelects } from '../components/select.js';
+import { avatarGroup } from '../components/avatars.js';
+import { filterGanttGroups, scheduleOf, personSummaryHtml } from './ganttFilter.js';
 
 /**
  * Global Gantt page: every project on one timeline, filterable by project,
@@ -12,11 +14,21 @@ import { selectHTML, mountSelects } from '../components/select.js';
  * by dragging their label onto a project header.
  */
 export default {
-  async mount(container) {
+  /**
+   * params.stakeholder — deep-link from the Stakeholders list
+   * (`#/gantt?stakeholder=<id>`): pre-filters the chart to that person's
+   * tasks so you can see which projects/tasks they touch and which are
+   * at-risk or already delayed.
+   */
+  async mount(container, params = {}) {
     let projects = []; // groups: { project, tasks, schedule }
     let stakeholders = [];
     let priorities = [];
-    const filters = { projectId: '', stakeholderId: '', status: '' };
+    const filters = {
+      projectId: '',
+      stakeholderId: params.stakeholder ? String(params.stakeholder) : '',
+      status: '',
+    };
 
     const load = async () => {
       const [ganttData, stk, prio] = await Promise.all([
@@ -29,35 +41,15 @@ export default {
       priorities = prio;
     };
 
-    const filteredGroups = () => {
-      return projects
-        .map((g) => {
-          let tasks = g.tasks;
-          if (filters.projectId) {
-            if (g.project.id !== Number(filters.projectId)) return null;
-          }
-          if (filters.stakeholderId) {
-            tasks = tasks.filter((t) => t.stakeholders.some((s) => s.stakeholderId === Number(filters.stakeholderId)));
-          }
-          if (filters.status) {
-            tasks = tasks.filter((t) => t.status === filters.status);
-          }
-          if (tasks.length === 0 && !(filters.projectId && g.project.id === Number(filters.projectId))) return null;
-          return { ...g, tasks, _total: g.tasks.length };
-        })
-        .filter(Boolean);
+    // Keep the deep-link URL in sync (replaceState doesn't fire hashchange,
+    // so no re-render is triggered).
+    const syncUrl = () => {
+      try {
+        history.replaceState(null, '', `#/gantt${filters.stakeholderId ? `?stakeholder=${filters.stakeholderId}` : ''}`);
+      } catch {
+        /* history unavailable — filter still works, only the URL lags */
+      }
     };
-
-    const scheduleOf = (groups) =>
-      groups.reduce(
-        (acc, g) => {
-          g.tasks.forEach((t) => {
-            acc[t.scheduleStatus] += 1;
-          });
-          return acc;
-        },
-        { ON_TRACK: 0, AT_RISK: 0, DELAYED: 0 }
-      );
 
     // The New Task form gets a fixed project ONLY when the page is already
     // filtered down to a single project; otherwise the user must pick one.
@@ -68,9 +60,23 @@ export default {
     };
 
     const render = () => {
-      const groups = filteredGroups();
+      const groups = filterGanttGroups(projects, filters);
       const data = { projects: groups, schedule: scheduleOf(groups) };
       const total = groups.reduce((n, g) => n + g.tasks.length, 0);
+      const stk = stakeholders.find((s) => s.id === Number(filters.stakeholderId));
+      const stkChip =
+        filters.stakeholderId && stk
+          ? `<span class="filter-chip" title="แสดงเฉพาะงานที่ ${escapeHtml(stk.name)} เกี่ยวข้อง">
+              ${avatarGroup([{ id: stk.id, name: stk.name }], { size: 'sm' })}
+              <span>${escapeHtml(stk.name)}</span>
+              <button type="button" class="filter-chip-x" id="clearStkFilter" title="ล้างตัวกรองบุคคล">✕</button>
+            </span>`
+          : '';
+      // Option A: one-line per-person summary (counts + at-risk/delayed).
+      const stkSummary =
+        filters.stakeholderId && stk
+          ? personSummaryHtml({ taskCount: total, projectCount: groups.length, schedule: data.schedule })
+          : '';
 
       container.innerHTML = `
         <div class="page-head">
@@ -89,6 +95,8 @@ export default {
               <label>Status
                 ${selectHTML({ name: 'filterStatus', options: [['', 'All Statuses'], ...TASK_STATUSES.map((s) => [s, s.replace('_', ' ')])], value: filters.status, placeholder: 'All Statuses', attrs: 'data-filter="status"' })}
               </label>
+              ${stkChip}
+              ${stkSummary}
               <button class="btn btn-secondary btn-sm" id="clearFilters">Clear</button>
               <span class="spacer"></span>
               <span class="text-muted" style="font-size:13px">${total} task(s) shown</span>
@@ -102,13 +110,20 @@ export default {
       container.querySelectorAll('[data-filter]').forEach((sel) => {
         sel.addEventListener('change', () => {
           filters[sel.dataset.filter] = sel.value;
+          if (sel.dataset.filter === 'stakeholderId') syncUrl();
           render();
         });
+      });
+      container.querySelector('#clearStkFilter')?.addEventListener('click', () => {
+        filters.stakeholderId = '';
+        syncUrl();
+        render();
       });
       container.querySelector('#clearFilters').addEventListener('click', () => {
         filters.projectId = '';
         filters.stakeholderId = '';
         filters.status = '';
+        syncUrl();
         render();
       });
 
