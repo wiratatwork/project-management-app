@@ -2,7 +2,9 @@ import { api } from '../api.js';
 import { escapeHtml } from '../utils.js';
 import { confirmDialog, toast } from '../components/ui.js';
 import { renderDataTable } from '../components/table.js';
+import { avatarGroup } from '../components/avatars.js';
 import { stakeholderFormModal } from '../components/forms.js';
+import { navigate } from '../router.js';
 
 export default {
   async mount(container) {
@@ -17,6 +19,7 @@ export default {
 
     const table = renderDataTable(container.querySelector('#stakeholdersTable'), {
       columns: [
+        { key: 'people', label: 'People', sortable: false, render: (r) => avatarGroup([{ id: r.id, name: r.name }]) },
         { key: 'name', label: 'Name', render: (r) => `<strong>${escapeHtml(r.name)}</strong>` },
         { key: 'email', label: 'Email' },
         { key: 'position', label: 'Position', render: (r) => escapeHtml(r.position || '—') },

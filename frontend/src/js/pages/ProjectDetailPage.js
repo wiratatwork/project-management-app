@@ -15,6 +15,7 @@ import {
   riskLevelBadge,
 } from '../components/ui.js';
 import { renderDataTable } from '../components/table.js';
+import { avatarGroup } from '../components/avatars.js';
 import { taskFormModal, riskFormModal, projectFormModal } from '../components/forms.js';
 import { setCrumbCurrent } from '../components/breadcrumbs.js';
 import { renderGantt, snapToBusinessDay } from '../components/GanttChart.js';
@@ -209,6 +210,7 @@ export default {
         columns: [
           { key: 'taskCode', label: 'Code', render: (r) => `<strong>${escapeHtml(r.taskCode)}</strong>` },
           { key: 'name', label: 'Task' },
+          { key: 'people', label: 'People', sortable: false, render: (r) => avatarGroup(r.stakeholders) },
           { key: 'priority', label: 'Priority', sortable: false, render: (r) => priorityChip(r.priority) },
           { key: 'status', label: 'Status', render: (r) => statusBadge(r.status) },
           { key: 'progressPercentage', label: 'Progress', render: (r) => progressBar(r.progressPercentage) },
@@ -560,7 +562,15 @@ export default {
           { key: 'riskScore', label: 'Score', render: (r) => `<strong>${r.riskScore}</strong>` },
           { key: 'riskLevel', label: 'Level', render: (r) => riskLevelBadge(r.riskLevel) },
           { key: 'status', label: 'Status', render: (r) => statusBadge(r.status) },
-          { key: 'owner', label: 'Owner', sortable: false, render: (r) => escapeHtml(r.owner?.name || '—') },
+          {
+            key: 'owner',
+            label: 'Owner',
+            sortable: false,
+            render: (r) =>
+              r.owner
+                ? `<span style="display:inline-flex;align-items:center;gap:8px">${avatarGroup([r.owner], { size: 'sm' })}<span>${escapeHtml(r.owner.name)}</span></span>`
+                : '—',
+          },
         ],
         fetch: (qs) => api.get(`/api/projects/${project.id}/risks?${qs}`),
         onRowClick: (row) => openRiskDetail(row),

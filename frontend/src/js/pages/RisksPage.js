@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { escapeHtml, formatDate, RISK_STATUSES, RISK_LEVEL_COLORS } from '../utils.js';
 import { statusBadge, riskLevelBadge, confirmDialog, toast } from '../components/ui.js';
 import { renderDataTable } from '../components/table.js';
+import { avatarGroup } from '../components/avatars.js';
 import { riskFormModal } from '../components/forms.js';
 import { renderRiskMatrix } from '../components/RiskMatrix.js';
 import { selectHTML, mountSelects } from '../components/select.js';
@@ -59,7 +60,15 @@ export default {
         { key: 'riskScore', label: 'Score', render: (r) => `<strong>${r.riskScore}</strong>` },
         { key: 'riskLevel', label: 'Level', render: (r) => riskLevelBadge(r.riskLevel) },
         { key: 'status', label: 'Status', render: (r) => statusBadge(r.status) },
-        { key: 'owner', label: 'Owner', sortable: false, render: (r) => escapeHtml(r.owner?.name || '—') },
+        {
+          key: 'owner',
+          label: 'Owner',
+          sortable: false,
+          render: (r) =>
+            r.owner
+              ? `<span style="display:inline-flex;align-items:center;gap:8px">${avatarGroup([r.owner], { size: 'sm' })}<span>${escapeHtml(r.owner.name)}</span></span>`
+              : '—',
+        },
         { key: 'identifiedDate', label: 'Identified', render: (r) => formatDate(r.identifiedDate) },
       ],
       fetch: (qs) => api.get(`/api/risks?${qs}`),

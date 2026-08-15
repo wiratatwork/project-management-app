@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { escapeHtml, formatDate } from '../utils.js';
 import { statusBadge, progressBar, confirmDialog, toast } from '../components/ui.js';
 import { renderDataTable } from '../components/table.js';
+import { avatarGroup } from '../components/avatars.js';
 import { projectFormModal } from '../components/forms.js';
 import { navigate } from '../router.js';
 
@@ -22,6 +23,7 @@ export default {
       columns: [
         { key: 'projectCode', label: 'Code', render: (r) => `<strong>${escapeHtml(r.projectCode)}</strong>` },
         { key: 'name', label: 'Name' },
+        { key: 'people', label: 'People', sortable: false, render: (r) => avatarGroup(r.stakeholders) },
         { key: 'status', label: 'Status', render: (r) => statusBadge(r.status) },
         { key: 'progressPercentage', label: 'Progress', render: (r) => progressBar(r.progressPercentage) },
         { key: 'plannedStartDate', label: 'Planned Start', render: (r) => formatDate(r.plannedStartDate) },

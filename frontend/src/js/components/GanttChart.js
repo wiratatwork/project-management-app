@@ -1,6 +1,7 @@
 import { escapeHtml } from '../utils.js';
 import { statusBadge } from './ui.js';
 import { selectHTML, mountSelects } from './select.js';
+import { avatarGroup } from './avatars.js';
 
 const ROW_H = 44;
 const GROUP_H = 38;
@@ -53,6 +54,8 @@ const SCHEDULE_META = {
   AT_RISK: { label: 'At risk', color: '#d97706' },
   ON_TRACK: { label: 'On track', color: '#16a34a' },
 };
+
+
 
 function dayKey(d) {
   return new Date(d).toISOString().slice(0, 10);
@@ -324,6 +327,12 @@ export function renderGantt(container, data, { onTaskClick, onNewTask, onResched
     .join('');
 
   // --- Labels (sticky column) ---------------------------------------------------------
+  const stkAvatars = (t) => {
+    const list = t.stakeholders || [];
+    if (list.length === 0) return '';
+    return `<span class="gantt-stks">${avatarGroup(list)}</span>`;
+  };
+
   const varianceNote = (t) => {
     if (t.scheduleStatus === 'DELAYED' && t.scheduleDaysLate > 0) return `${t.scheduleDaysLate}d late`;
     if (t.scheduleStatus === 'AT_RISK') return t.startedLateDays > 0 ? `started ${t.startedLateDays}d late` : 'approaching end';
@@ -355,6 +364,7 @@ export function renderGantt(container, data, { onTaskClick, onNewTask, onResched
             <span class="tname">${escapeHtml(t.name)}</span>
             <span class="tdates">${compactDate(t.plannedStartDate)} → ${compactDate(t.plannedEndDate)}${varNote ? ` <span class="tvar ${t.scheduleStatus.toLowerCase()}">${escapeHtml(varNote)}</span>` : ''}</span>
           </span>
+          ${stkAvatars(t)}
         </div>`;
     })
     .join('');

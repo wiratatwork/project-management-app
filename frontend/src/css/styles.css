@@ -960,6 +960,30 @@ tr.row-overdue { animation: overdue-blink 1.2s ease-in-out infinite; }
 .gantt-row.gantt-group-row, .gantt-row-label.gantt-group-label { background: var(--table-head-bg); }
 .gantt-row.gantt-group-row:hover .gantt-row-label, .gantt-row-label.gantt-group-label:hover { background: var(--track-bg); }
 .gantt-row.gantt-group-row.drop-target, .gantt-row-label.gantt-group-label.drop-target { background: #c7d2fe; outline: 2px dashed #4f46e5; outline-offset: -2px; }
+/* Circular profile avatars (shared: Gantt task rows, Tasks/Risks tables) */
+.avatar-group { display: inline-flex; align-items: center; flex-shrink: 0; }
+.avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border: 2px solid var(--surface);
+  margin-left: -5px;
+  flex-shrink: 0;
+  user-select: none;
+}
+.avatar:first-child { margin-left: 0; }
+.avatar-more { background: var(--track-bg); color: var(--text-muted); }
+.avatar-sm { width: 18px; height: 18px; font-size: 8px; border-width: 1.5px; }
+/* Gantt task rows: place the avatar group at the right edge of the name column */
+.gantt-stks { display: inline-flex; align-items: center; margin-left: auto; flex-shrink: 0; padding-left: 4px; }
+/* DataTable cells: keep the group from touching the cell edge */
+.data-table td .avatar-group { margin-left: 2px; }
 .gantt-row-label .gname { font-weight: 700; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gantt-row-label .gcode { font-size: 11px; color: var(--text-muted); font-weight: 600; }
 .gantt-drag { cursor: grab; color: var(--text-faint); font-size: 13px; user-select: none; flex-shrink: 0; }
