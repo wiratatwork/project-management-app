@@ -20,7 +20,7 @@ ProjectFlow lets a team manage:
 - **Dashboard** — summary cards, project progress, task/risk charts
 - **Gantt chart** — planned vs actual timelines, progress overlays, dependency connectors, today marker, **plan-vs-actual delay analysis** (tasks flagged `ON_TRACK` / `AT_RISK` / `DELAYED` with days-late counts), sortable, and **full task CRUD directly from the chart** (New Task button; click a task to edit or delete). On the **global Gantt page** the New Task form forces you to **pick a project yourself** (required select) unless the page is already **filtered down to one project**, in which case that project is fixed
 - **Global Gantt page** — every project on one timeline, filterable by **project**, **stakeholder** and **task status**, with switchable **timeline scales** (Day / Week / 2 Weeks / Month / Quarter; compressed views always fill the viewport width so bars and axis labels stay readable); **drag the planned bar** (or its right edge) to reschedule a task, and **drag a task to reorder it within its project** (tasks with dependencies are locked, and cross-project moves are not possible); the task-name column can be **pinned (default, frozen while scrolling), scrolled, or hidden** via the toolbar dropdown and **resized by dragging its right edge** (160–480px), and **zoom in/out buttons** (50%–400%) magnify the timeline on top of the chosen scale — all view settings (scale, sort, column mode/width, zoom) are **remembered in `localStorage`** across pages and sessions, with a **⟲ Reset view** button (shown when the view differs from defaults) to restore everything at once
-- **Light theme by default with a Dark mode** — switch via the ☀️/🌙 menu in the top-right of the top bar; your choice is saved in `localStorage` (all colors are CSS variables, so every screen adapts)
+- **Light theme by default with a Dark mode** — switch via the ☀️/🌙 menu in the top-right of the top bar; the same menu offers **7 color templates** (Default indigo, Ocean, Emerald, Violet, Rose, Amber, Teal) that re-tint the whole look — accent color (buttons, links, nav, tabs, chips, progress, Gantt bars), the **sidebar & header chrome** (light = pale accent wash, dark = accent mixed into the dark surface) and the **login-page gradient** — in both light and dark; both choices are saved in `localStorage` (all colors are CSS variables, so every screen adapts)
 - **Breadcrumbs + Back on every page** — a shared component (`frontend/src/js/components/breadcrumbs.js`) injected above all pages shows the trail (e.g. `Home / Projects / <project name>`, with the project name filled in once loaded) plus a **Back button** that goes one level up the app tree (project detail → Projects list, top-level pages → Dashboard; never leaves the app); the Home crumb links back to the dashboard. On the project-detail page the **Projects crumb is a dropdown project switcher** — click it to search and jump straight to any project (list cached 30s, current project highlighted with a check, status color dots, closes on outside click / Escape). The **project sub-tabs (Overview / Tasks / Gantt / Stakeholders / Risks) remember the last-selected tab per project** in `localStorage` (`pm_project_tab_<projectId>`) so a refresh reopens the same tab (falls back to Overview for unknown values)
 - **One searchable dropdown everywhere** — every `<select>` in the app (toolbar filters, Gantt scale/sort, all form fields) is the same `Select` component (`frontend/src/js/components/select.js`): type to search/filter options, arrow+enter keyboard navigation, and it exposes the same `value`/`change` API as a native select
 - **Overdue tasks flash red** — on the project's Tasks tab and in every Gantt view (project Gantt tab + global Gantt page), a task whose due date has passed (`overdue: true`) gets a **blinking red background** on its whole row (shared `overdue-blink` keyframe; table rows via a `rowClass` hook in the DataTable, Gantt rows via an `overdue` class; blink pauses on hover)
@@ -57,7 +57,7 @@ The backend is a **modular monolith** with a strict layering:
 Route → Controller → Service → Repository → Prisma → PostgreSQL
 ```
 
-- **routes** — HTTP wiring + request validation + Swagger annotations
+- **routes** — HTTP wiring + request validation
 - **controllers** — request/response handling (thin)
 - **services** — business logic: dependency cycle detection, progress calculation,
   overdue detection, risk scoring, date validation
@@ -83,7 +83,7 @@ No business logic lives inside Express routes.
 │   ├── vitest.config.js        # coverage thresholds + worker cap
 │   ├── src/
 │   │   ├── app.js / server.js
-│   │   ├── config/             # env, swagger/OpenAPI definition
+│   │   ├── config/             # env
 │   │   ├── controllers/
 │   │   ├── services/
 │   │   ├── repositories/
@@ -118,7 +118,6 @@ No business logic lives inside Express routes.
 | Auth       | JWT (jsonwebtoken) + bcryptjs password hashing          |
 | Security   | Helmet, CORS, express-rate-limit, Prisma (SQL injection safe) |
 | Logging    | pino + pino-http (structured JSON, secrets redacted)    |
-| Docs       | Swagger UI + OpenAPI 3.0 (swagger-jsdoc)                |
 | Frontend   | Vanilla HTML/CSS/JS ES modules (no framework, no build step) |
 | Charts     | Hand-rolled SVG/div charts (donut, bars, risk matrix)   |
 | Testing    | Vitest + Supertest                                      |
@@ -153,8 +152,6 @@ First build takes a few minutes; afterwards it is fast.
 | ------------- | --------------------------- |
 | Frontend      | http://localhost:8080       |
 | Backend API   | http://localhost:3000/api   |
-| Swagger / OpenAPI | http://localhost:8080/api-docs |
-| Raw OpenAPI spec | http://localhost:8080/api-docs.json |
 
 **Demo login:** `admin` / `admin123`
 
@@ -248,8 +245,7 @@ docker compose exec backend node prisma/seed.js
 
 ## 9. API Documentation
 
-Interactive Swagger UI: **http://localhost:8080/api-docs** (or `http://localhost:3000/api-docs`).
-
+The API is not exposed via Swagger/OpenAPI UI — the interactive docs were removed.
 All endpoints (except `POST /api/auth/login` and `GET /api/health`) require:
 
 ```

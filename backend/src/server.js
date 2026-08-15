@@ -14,7 +14,6 @@ async function start() {
 
   const server = app.listen(env.port, () => {
     logger.info(`API listening on port ${env.port} (${env.nodeEnv})`);
-    logger.info(`Swagger docs at http://localhost:${env.port}/api-docs`);
   });
 
   const shutdown = (signal) => {

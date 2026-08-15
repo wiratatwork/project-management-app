@@ -40,6 +40,17 @@
 - [ ] **Risks** — สร้าง/แก้/ลบ, probability×impact เปลี่ยน score + level ตาม, status pill, matrix ตรง
 - [ ] **Global Gantt** — filter ตามโปรเจกต์/stakeholder/status, timeline scale สลับได้
 - [ ] **Dark mode** — สลับ ☀️/🌙 แล้วทุกหน้าเข้ากัน, ค่าจำได้หลัง refresh
+- [ ] **Header/Sidebar shadow** — header (ติดด้านบน) และ sidebar มี box shadow อ่อนๆ ลอยจากเนื้อหา,
+      เห็นชัดทั้ง light และ dark (dark จะเข้มกว่า)
+- [ ] **UI polish (ui-ux-pro-max)** — tab/pagination/ปุ่มเมนูธีม/ปุ่ม zoom มี hover + focus ring ชัดเจน;
+      zoom Gantt เป็น segmented pill; stat card hover แล้วยกขึ้นเล็กน้อย; metadata ในหน้า project detail
+      คั่นด้วยเส้นแนวตั้ง; ตัวหนังสือ muted อ่านง่ายขึ้น (light mode); ทั้งหมดทำงานทั้ง light/dark
+- [ ] **Color template** — ในเมนู ☀️/🌙 มีหัวข้อ "Color template" (Default/Ocean/Emerald/Violet/Rose/Amber/Teal)
+      พร้อมวงสวอตช์สี: เลือกแล้วสี accent (ปุ่มหลัก, ลิงก์, nav active, แท็บ, chips, progress bar, แถบ planned
+      ใน Gantt, gradient บน modal) เปลี่ยนตามทั้งโหมด light และ dark — **chrome ด้วย**: sidebar + header
+      เปลี่ยนเป็นทินต์ของสี template (light = สีจาง, dark = ผสม primary ในพื้นมืด), หน้า login มี gradient
+      จบด้วยสี template, hover บน sidebar เป็น primary-tint, ตัวเลือกมีเครื่องหมาย ✓, จำค่าได้หลัง refresh
+      (localStorage `pm_theme_template`), กลับไป Default ได้, Default ก็มีทินต์ indigo อ่อนเหมือนกัน
 - [ ] **Breadcrumbs/Back** — หน้า Project detail มี trail + ปุ่ม Back, dropdown สลับโปรเจกต์
 
 ### C.1 Bulk select & delete (checkbox column) — ทุกตารางที่ลบได้ (Projects / Tasks / Risks / Stakeholders / Priorities)
@@ -100,7 +111,7 @@
 
 | แก้ส่วน | เช็คอะไรเพิ่ม |
 | --- | --- |
-| validators/ | รัน `validation.test.js` + ลองส่ง payload ผิดผ่าน Swagger (`/api-docs`) |
+| validators/ | รัน `validation.test.js` + ลองส่ง payload ผิดผ่าน API โดยตรง (curl/Postman) |
 | services/ | รัน `api.test.js` + `dashboard-gantt.test.js` — กติกาข้อ 4 ใน `01-system-analysis.md` |
 | middleware/ | รัน `security.test.js` + unit ของ middleware |
 | repositories/ หรือ schema.prisma | `npm run db:test:prepare` + รันทุกอย่าง (ต้อง migrate ใหม่) |

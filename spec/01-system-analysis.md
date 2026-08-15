@@ -28,7 +28,7 @@ PostgreSQL 16 (Docker volume)
 
 ## 2. โมดูลหลัก (backend/src)
 
-### routes/ — การประกาศเส้นทาง + Swagger annotation
+### routes/ — การประกาศเส้นทาง
 | ไฟล์ | เส้นทาง | หมายเหตุ |
 | --- | --- | --- |
 | `index.js` | — | `/auth` สาธารณะ, ทุกอย่างที่เหลือผ่าน `requireAuth` |
@@ -140,13 +140,31 @@ PostgreSQL 16 (Docker volume)
 ## 6. Frontend (เทสต์อัตโนมัติเฉพาะ component logic — UI เต็มรูปแบบใช้ manual checklist)
 
 - `js/api.js` — fetch client + JWT, `js/router.js` — hash router **รองรับ query params ใน hash** (deep link เช่น `#/gantt?stakeholder=331`),
-  `js/app.js` — bootstrap/auth guard
+  `js/app.js` — bootstrap/auth guard + **ธีม**: light/dark ผ่าน `data-theme` และ **color template** (สี accent)
+  ผ่าน `data-template` — 7 แบบ (default/indigo, ocean, emerald, violet, rose, amber, teal) ใช้ร่วมกับ
+  light/dark ได้ จำค่าใน localStorage `pm_theme` / `pm_theme_template`; template แต่ละแบบมีชุดสี
+  แยก light/dark (ดู `css/styles.css`) และสีที่เคย hardcode (เงาปุ่ม, gradient modal, แถบ planned ใน Gantt)
+  เปลี่ยนเป็น `var(--primary)` / `color-mix` เพื่อให้เปลี่ยนตาม template — **นอกจากสี accent แล้ว
+  template ยัง tint chrome ทั้งหมดด้วย**: `--header-bg`/`--sidebar-bg` ใน light = `var(--primary-light)`
+  (wash จางของ accent) ใน dark = `color-mix` ของ primary กับสีพื้นมืด; `--sidebar-hover` ก็เป็น
+  primary-tint เช่นกัน; หน้า login ใช้ gradient `color-mix(in srgb, var(--primary) 12–45%, #0f172a)`
+  ให้โทนจบที่สี template (app.js ตั้ง `data-template` เสมอรวมถึง default เพื่อให้ rule เหล่านี้ทำงาน);
+  header (sticky) และ sidebar มี `box-shadow: var(--shadow-bar)` อ่อนๆ เพื่อลอยจากพื้นหลัง (แยกค่าตาม
+  light/dark — เข้มขึ้นใน dark)
+
+**รายละเอียด polish ตาม ui-ux-pro-max (อัปเดตล่าสุด):**
+- ทุกตัว interactive มี transition 150–200ms + focus-visible ring: `tab`, `dt-page`, `theme-menu button`,
+  `gantt-zoom .btn`, sortable th — และ `prefers-reduced-motion` ปิด transition/hover lift ทั้งหมด
+- `stat-card` มี hover lift (translateY(-2px) + `--shadow-lg` + ขอบ tint ตาม primary)
+- `detail-meta` (หน้า project detail) คั่นด้วย vertical rule ระหว่างรายการ
+- zoom control ใน Gantt เป็น segmented pill (`- | 100% | +`) ภายในกล่องขอบเดียว
+- ตัวอักษร muted ใน light mode เข้มขึ้นเป็น `--text-muted: #475569` (slate-600, WCAG AA)
 - components: `table.js` (DataTable: pagination/search/sort/ลากเรียงคอลัมน์/ปรับความกว้าง + **selectable**),
   `select.js` (dropdown ค้นหาได้), `forms.js` (modal/pill/date picker), `GanttChart.js` (ลาก bar/ปรับขนาด/ซูม),
   `avatars.js` (วงกลมโปรไฟล์กลาง ดู 6.2/6.3), `RiskMatrix.js`, `charts.js`, `ui.js`, `breadcrumbs.js`
 - pages: Login, Dashboard, Projects, ProjectDetail (Overview/Tasks/Gantt/Stakeholders/Risks), Gantt (global), Stakeholders, Priorities, Risks
 - ฟีเจอร์ฝั่ง UI ที่ backend ตรวจไม่ถึง (ต้องเช็ค manual): การ validate วันที่แบบ live, pill selectors,
-  การ snap วันเสาร์/อาทิตย์ใน Gantt drag, dark mode, การจำ view ใน localStorage
+  การ snap วันเสาร์/อาทิตย์ใน Gantt drag, dark mode + color template, การจำ view ใน localStorage
 
 ### 6.1 Bulk select & delete (checkbox column) — ฟีเจอร์ใน `table.js`
 
@@ -217,4 +235,4 @@ PostgreSQL 16 (Docker volume)
 ## 7. เอกสารอ้างอิงอื่น
 
 - `README.md` (root) — quick start, env vars, API docs, deployment
-- Swagger UI: `http://localhost:8080/api-docs` หรือ `http://localhost:3000/api-docs`
+- **หมายเหตุ**: ไม่มี Swagger/OpenAPI UI ให้ใช้งานอีกแล้ว (`/api-docs` ถูกลบออกจาก backend, frontend และ nginx) — เอกสารอ้างอิง API อยู่ที่ README.md ข้อ 9

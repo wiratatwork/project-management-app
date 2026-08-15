@@ -2,7 +2,7 @@
  * Lightweight development server (no dependencies).
  *
  * - Serves the static frontend from ./src
- * - Proxies /api and /api-docs to the backend (default http://localhost:3000)
+ * - Proxies /api to the backend (default http://localhost:3000)
  *
  * Usage:  node dev-server.js [port]
  */
@@ -73,7 +73,7 @@ function proxy(req, res) {
 }
 
 const server = http.createServer((req, res) => {
-  if (req.url.startsWith('/api') || req.url.startsWith('/api-docs')) {
+  if (req.url.startsWith('/api')) {
     proxy(req, res);
   } else {
     serveStatic(req, res);

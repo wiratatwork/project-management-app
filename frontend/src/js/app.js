@@ -6,6 +6,18 @@ import { breadcrumbBarHTML, bindBreadcrumbs } from './components/breadcrumbs.js'
 const root = document.getElementById('app');
 
 const THEME_KEY = 'pm_theme';
+const TEMPLATE_KEY = 'pm_theme_template';
+
+// Accent color templates (light+dark aware), picked from the theme menu.
+const THEME_TEMPLATES = [
+  { id: 'default', label: 'Default', swatch: 'default' },
+  { id: 'ocean', label: 'Ocean', swatch: 'ocean' },
+  { id: 'emerald', label: 'Emerald', swatch: 'emerald' },
+  { id: 'violet', label: 'Violet', swatch: 'violet' },
+  { id: 'rose', label: 'Rose', swatch: 'rose' },
+  { id: 'amber', label: 'Amber', swatch: 'amber' },
+  { id: 'teal', label: 'Teal', swatch: 'teal' },
+];
 
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
@@ -17,8 +29,20 @@ function applyTheme(theme) {
   });
 }
 
-// Apply stored theme early to avoid a flash of the wrong theme.
+function applyTemplate(template) {
+  template = THEME_TEMPLATES.some((t) => t.id === template) ? template : 'default';
+  // Always set the attribute (including 'default') so the CSS rules that
+  // re-tint the header/sidebar from the accent apply consistently.
+  document.documentElement.dataset.template = template;
+  localStorage.setItem(TEMPLATE_KEY, template);
+  document.querySelectorAll('.theme-menu [data-template-choice]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.templateChoice === template);
+  });
+}
+
+// Apply stored theme + color template early to avoid a flash of the wrong look.
 applyTheme(localStorage.getItem(THEME_KEY) || 'light');
+applyTemplate(localStorage.getItem(TEMPLATE_KEY) || 'default');
 
 const NAV_ITEMS = [
   { href: '#/dashboard', label: 'Dashboard', icon: 'bi-speedometer2' },
@@ -45,13 +69,18 @@ function renderAppShell() {
       <button class="icon-btn sidebar-toggle" id="sidebarToggle" aria-label="Toggle menu"><i class="bi bi-list"></i></button>
       <div class="brand"><span class="brand-logo"><i class="bi bi-bar-chart"></i></span> ProjectFlow</div>
       <div class="header-right">
-        <a class="header-link" href="/api-docs" target="_blank" rel="noopener">API Docs</a>
         <span class="header-user"><i class="bi bi-person"></i> <span id="currentUser">admin</span></span>
         <div class="theme-menu-wrap">
           <button class="icon-btn theme-toggle" id="themeToggle" aria-label="Switch theme" title="Switch theme"><i class="bi bi-moon-stars"></i></button>
           <div class="theme-menu" id="themeMenu" hidden>
             <button type="button" data-theme-choice="light"><i class="bi bi-sun"></i> Light</button>
             <button type="button" data-theme-choice="dark"><i class="bi bi-moon-stars"></i> Dark</button>
+            <div class="theme-menu-divider"></div>
+            <div class="theme-menu-label">Color template</div>
+            ${THEME_TEMPLATES.map((t) => `
+              <button type="button" data-template-choice="${t.id}">
+                <span class="tmpl-swatch ${t.swatch}"></span>${t.label}<i class="bi bi-check-lg tmpl-check"></i>
+              </button>`).join('')}
           </div>
         </div>
         <button class="btn btn-ghost btn-sm" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Logout</button>
@@ -103,8 +132,9 @@ async function renderPage() {
     location.hash = '#/login';
   });
 
-  // Theme menu (top-right)
+  // Theme menu (top-right): light/dark + color templates
   applyTheme(localStorage.getItem(THEME_KEY) || 'light');
+  applyTemplate(localStorage.getItem(TEMPLATE_KEY) || 'default');
   const themeToggle = document.getElementById('themeToggle');
   const themeMenu = document.getElementById('themeMenu');
   themeToggle.addEventListener('click', (e) => {
@@ -113,9 +143,16 @@ async function renderPage() {
   });
   themeMenu.addEventListener('click', (e) => {
     const choice = e.target.closest('[data-theme-choice]');
-    if (!choice) return;
-    applyTheme(choice.dataset.themeChoice);
-    themeMenu.hidden = true;
+    if (choice) {
+      applyTheme(choice.dataset.themeChoice);
+      themeMenu.hidden = true;
+      return;
+    }
+    const tmpl = e.target.closest('[data-template-choice]');
+    if (tmpl) {
+      applyTemplate(tmpl.dataset.templateChoice);
+      themeMenu.hidden = true;
+    }
   });
 
   const stored = localStorage.getItem('pm_user');
