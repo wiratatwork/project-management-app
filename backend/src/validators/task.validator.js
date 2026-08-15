@@ -65,7 +65,6 @@ const updateTaskSchema = refineDateRanges(
     if (
       data.dueDate &&
       data.plannedStartDate &&
-      data.plannedEndDate &&
       data.dueDate < data.plannedStartDate
     ) {
       ctx.addIssue({
