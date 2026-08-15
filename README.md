@@ -74,11 +74,13 @@ No business logic lives inside Express routes.
 ├── .env.example                # copy to .env
 ├── backend/
 │   ├── Dockerfile
-│   ├── docker-entrypoint.sh    # migrate deploy → seed → start
+│   ├── docker-entrypoint.sh    # migrate deploy → conditional seed → start
 │   ├── prisma/
 │   │   ├── schema.prisma       # full schema with indexes & cascade rules
 │   │   ├── migrations/         # committed Prisma migrations
 │   │   └── seed.js             # idempotent demo data
+│   ├── scripts/                # prepare-test-db.js — creates/migrates/seeds the test DB
+│   ├── vitest.config.js        # coverage thresholds + worker cap
 │   ├── src/
 │   │   ├── app.js / server.js
 │   │   ├── config/             # env, swagger/OpenAPI definition
@@ -90,7 +92,7 @@ No business logic lives inside Express routes.
 │   │   ├── validators/         # zod schemas
 │   │   ├── prisma/             # Prisma client instance
 │   │   └── utils/              # AppError, delay, progress, dependencyGraph, riskLevel, dates
-│   └── tests/                  # unit + integration tests (Vitest)
+│   └── tests/                  # unit (no DB) + integration (Supertest) tests (Vitest)
 └── frontend/
     ├── Dockerfile
     ├── nginx.conf              # SPA + /api proxy
@@ -138,7 +140,11 @@ cp .env.example .env        # optional — sensible defaults exist
 docker compose up -d
 ```
 
-The backend container automatically applies migrations, seeds demo data, and starts.
+The backend container automatically applies migrations, then starts. Demo
+seed data is created **only when the database is empty** (a fresh install
+needs the `admin` login) — an existing database is never re-seeded, so demo
+projects do not reappear on every restart. Override with `SEED_ON_START`
+(`true` = always seed, `false` = never; see section 8).
 First build takes a few minutes; afterwards it is fast.
 
 ### Access
@@ -171,6 +177,9 @@ POSTGRES_DB=project_management
 
 # Used by the backend container (hostname = compose service name)
 DATABASE_URL=postgresql://pm_user:pm_password@postgres:5432/project_management
+
+# Tests automatically use a separate DB: <POSTGRES_DB>_test (e.g. project_management_test)
+# Override with TEST_DB_NAME or TEST_DATABASE_URL if needed
 
 JWT_SECRET=change_this_secret    # ⚠️ change in any real deployment
 JWT_EXPIRES_IN=1d
@@ -219,6 +228,19 @@ npx prisma migrate deploy         # apply committed migrations
 
 Dates are generated relative to "today", so the dashboard always shows live
 examples of overdue tasks and delayed projects.
+
+**When is seeding automatic?** On container start the backend runs the seed
+**only when the database is empty** (a fresh install needs the `admin` user to
+log in). An existing database is never re-seeded, so the demo projects do **not**
+come back on every restart. Control it with `SEED_ON_START` in your `.env`:
+
+| `SEED_ON_START` | Behavior on container start |
+| --- | --- |
+| *(unset)* | Seed only if the database is empty |
+| `true` | Always seed (idempotent — re-creates demo data every restart) |
+| `false` | Never seed automatically |
+
+To (re)seed manually at any time:
 
 ```bash
 docker compose exec backend node prisma/seed.js
@@ -366,23 +388,82 @@ node dev-server.js   # http://localhost:4173
 
 ## 12. Testing
 
+Tests run against a **dedicated test database** — `project_management_test` by
+default — created inside the same postgres container. They **never touch** the
+real `project_management` database used by `docker compose up -d --build`.
+
 ```bash
-# Unit + integration tests (integration tests need the DB up + seeded)
+# 1. Ensure the database container is running
+# (the test DB is created on demand — nothing else needed)
+docker compose up -d postgres
+
+# 2. Run all tests
 cd backend
-docker compose up -d postgres        # ensure DB is running
-npx prisma migrate deploy
-node prisma/seed.js
 npm test
 ```
 
-Coverage (41 tests):
+`npm test` first runs `npm run db:test:prepare`, which automatically:
 
-- Unit: overdue/delay detection, circular dependency detection, progress
-  calculation (completed-count and weighted), risk score + levels
-- Integration (Supertest against the real API + PostgreSQL):
-  project CRUD, task CRUD, self/indirect dependency rejection, cross-project
-  dependency rejection, date validation, automatic progress recalculation,
-  overdue flags, risk score computation, dashboard + gantt endpoints, auth
+1. **creates** the test database (if missing) inside the postgres container,
+2. **migrates** it (`prisma migrate deploy`),
+3. **seeds** the demo data (idempotent — integration tests need the `admin`
+   user and the seeded priorities).
+
+The test database name is derived from your Postgres config as
+`<POSTGRES_DB>_test`; override it with `TEST_DB_NAME` or the full
+`TEST_DATABASE_URL` if you ever need a different environment.
+
+Measure coverage (and enforce it via `backend/vitest.config.js` thresholds):
+
+```bash
+cd backend
+npm run test:coverage
+```
+
+Current suite: **162 tests / 16 files** with **~95% statement coverage** of `src/`.
+
+- **Unit** (no DB): overdue/delay + schedule status, dependency cycles,
+  progress (completed-count & weighted), risk scoring, date utils, pagination
+  utils, `parseId`, auth middleware, zod validate middleware, error handler
+- **Integration** (Supertest + the real API on the test DB): project/task/risk/
+  stakeholder/priority CRUD, auth & rate limiting, health, 404s, malformed
+  JSON, invalid ids, duplicate conflicts, cascades on delete, reorder,
+  auto progress/task codes, risk lifecycle (resolvedDate), pagination/search,
+  dashboard + gantt endpoints
+
+### Frontend component tests (vitest + jsdom, no Docker/DB needed)
+
+```bash
+cd frontend
+npm install   # first time only
+npm test
+```
+
+Covers the shared components' logic:
+
+- **`tests/table.test.js`** — DataTable: the fixed checkbox column
+  (non-reorderable/non-resizable/non-sortable), row & select-all checkboxes
+  with indeterminate state, the "Delete selected (N)" flow (confirm dialog →
+  bulk delete → reload), error toasts, and checkbox/row-click isolation
+- **`tests/gantt.test.js`** — GanttChart: per-task stakeholder profile circles
+  (initials, overflow "+N", tooltip, deterministic color per stakeholder,
+  global mode)
+- **`tests/avatars.test.js`** — the shared avatar component (`avatars.js`,
+  reused by Gantt, the "People" columns of the Projects/Tasks/Stakeholders
+  tables and the Risks "Owner" column): initials, empty input, "+N"
+  overflow, tooltips, deterministic color, size variant
+- **`tests/ganttFilter.test.js` + `tests/router.test.js`** — the
+  Stakeholders → Gantt deep link (`#/gantt?stakeholder=<id>`): filtering a
+  person's tasks across projects, the per-person summary line
+  (`N งาน · M โปรเจกต์ · เสี่ยง X · delay แล้ว Y`), schedule-health counts
+  of the filtered view, and router query-param parsing
+
+Currently **44 tests** across the five files.
+
+> **Spec & regression docs**: the `spec/` folder contains the system analysis,
+> the full test plan with a coverage matrix, and a regression checklist to run
+> after any code change. Rule: **every code change updates the spec + test
+> cases too** (see `spec/README.md`).
 
 ## 13. Production Deployment
 
@@ -407,6 +488,9 @@ For a real deployment:
 - The risk matrix shows counts of **open** risks per cell.
 - Seed re-syncs dependencies/stakeholder links/risks for the seeded projects only —
   user-created data is never touched.
+- The backend container only auto-seeds an **empty** database (unless
+  `SEED_ON_START=true`); to stop demo data from ever appearing, set
+  `SEED_ON_START=false` in `.env`.
 
 ## 15. Useful Commands
 
