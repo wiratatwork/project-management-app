@@ -28,6 +28,7 @@ export function renderDataTable(container, {
   initialSort = {},
   extraParams = {},
   tableKey,
+  rowClass = () => '',
 } = {}) {
   const state = {
     page: 1,
@@ -150,7 +151,7 @@ export function renderDataTable(container, {
               .map((a) => `<button class="btn btn-sm ${a.className || 'btn-secondary'}" data-act="${escapeHtml(a.label)}">${escapeHtml(a.label)}</button>`)
               .join('')}</td>`
           : '';
-        return `<tr class="${onRowClick ? 'clickable' : ''} ${row._rowClass || ''}" data-id="${row.id}">${tds}${actionTds}</tr>`;
+        return `<tr class="${onRowClick ? 'clickable' : ''} ${row._rowClass || ''} ${rowClass(row)}" data-id="${row.id}">${tds}${actionTds}</tr>`;
       })
       .join('');
   };

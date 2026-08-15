@@ -232,6 +232,7 @@ export default {
         ],
         fetch: (qs) => api.get(`/api/projects/${project.id}/tasks?${qs}`),
         onRowClick: (row) => openTaskDetail(row.id),
+        rowClass: (r) => (r.overdue ? 'row-overdue' : ''),
         actions: [
           { label: 'Edit', className: 'btn-secondary', onClick: (row) => openEditTask(row) },
           { label: 'Delete', className: 'btn-danger', onClick: (row) => removeTask(row) },
@@ -580,6 +581,7 @@ export default {
 
       const openCreateRisk = () => {
         riskFormModal({
+          project,
           stakeholders,
           onSubmit: async (payload) => {
             await api.post(`/api/projects/${project.id}/risks`, payload);

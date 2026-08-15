@@ -28,6 +28,18 @@ export function field({ name, label, type = 'text', value = '', required = false
 }
 
 /**
+ * Read-only value shown as plain text instead of a disabled input — used for
+ * fields the user cannot change (e.g. Task Code on edit, locked Project).
+ */
+export function staticField({ label, value = '', full = false, mono = false }) {
+  const v = value === null || value === undefined ? '—' : String(value);
+  return `<div class="form-field ${full ? 'full' : ''}">
+    <label>${escapeHtml(label)}</label>
+    <div class="field-static${mono ? ' mono' : ''}">${escapeHtml(v)}</div>
+  </div>`;
+}
+
+/**
  * Selectable pill group (radio-style chips with a color accent) — used for
  * Status / Priority in forms instead of a dropdown. Values are read by
  * `collectForm` exactly like a radio group.
@@ -344,7 +356,7 @@ export async function taskFormModal({ task, project, projects = [], priorities =
   const depIds = (t.dependencies || []).map((d) => d.dependsOnTaskId);
 
   const projectField = project
-    ? `<div class="form-field full"><label>Project</label><input type="text" value="${escapeHtml(`${project.projectCode} — ${project.name}`)}" disabled /></div>`
+    ? staticField({ label: 'Project', value: `${project.projectCode} — ${project.name}`, full: true })
     : field({
         name: 'projectId',
         label: 'Project',
@@ -363,12 +375,16 @@ export async function taskFormModal({ task, project, projects = [], priorities =
       .map((pt) => [pt.id, `${pt.taskCode} — ${pt.name}`]);
     depField = `<div class="form-field full">
       <label>Dependencies (finish-to-start) <span class="stk-count" id="depCount">0 selected</span></label>
+      <div class="dep-search">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input type="text" id="depSearch" placeholder="Search by task code or name…" autocomplete="off" />
+      </div>
       <div class="checkbox-list deps-list">${
         options.length
           ? options
               .map(([id, text]) => {
                 const checked = depIds.includes(id) ? 'checked' : '';
-                return `<label class="cl-row"><input type="checkbox" name="dependencyIds" value="${id}" ${checked}><span class="cl-check"><i class="bi bi-check-lg"></i></span><span class="cl-text">${escapeHtml(text)}</span></label>`;
+                return `<label class="cl-row" data-dep-label="${escapeHtml(text.toLowerCase())}"><input type="checkbox" name="dependencyIds" value="${id}" ${checked}><span class="cl-check"><i class="bi bi-check-lg"></i></span><span class="cl-text">${escapeHtml(text)}</span></label>`;
               })
               .join('')
           : '<div class="help">No other tasks in this project yet.</div>'
@@ -409,7 +425,7 @@ export async function taskFormModal({ task, project, projects = [], priorities =
     <section class="form-section">
       <h4 class="form-section-title"><i class="bi bi-briefcase"></i> Details</h4>
       ${projectField}
-      ${task ? field({ name: 'taskCode', label: 'Task Code', value: t.taskCode, disabled: true }) : ''}
+      ${task ? staticField({ label: 'Task Code', value: t.taskCode, mono: true }) : ''}
       ${field({ name: 'name', label: 'Task Name', value: t.name, required: true })}
       ${pillGroup({ name: 'priorityId', label: 'Priority', value: t.priorityId ? String(t.priorityId) : '', options: priorities.map((p) => [String(p.id), p.name, p.color]), required: true })}
       ${field({ name: 'description', label: 'Description', value: t.description, type: 'textarea', rows: 2, full: true })}
@@ -651,6 +667,16 @@ export async function taskFormModal({ task, project, projects = [], priorities =
   depsList?.addEventListener('change', updateDepCount);
   updateDepCount();
 
+  // Dependency search — filters rows by task code or name (case-insensitive).
+  const depSearch = modal.body.querySelector('#depSearch');
+  depSearch?.addEventListener('input', () => {
+    const q = depSearch.value.trim().toLowerCase();
+    depsList?.querySelectorAll('.cl-row').forEach((row) => {
+      const label = row.dataset.depLabel || '';
+      row.style.display = !q || label.includes(q) ? '' : 'none';
+    });
+  });
+
   return modal;
 }
 
@@ -712,10 +738,10 @@ function colorPickerField({ name = 'color', value = '' } = {}) {
       </div>
       <div class="cp-actions">
         <input type="color" class="cp-native" value="${isHexColor(current) ? current : '#6366f1'}" title="Pick a custom color" />
-        <input type="text" class="cp-hex" value="${escapeHtml(current)}" maxlength="9" spellcheck="false" placeholder="#6366f1" title="Hex color code" />
+        <span class="cp-hex" data-cp-hex>${isHexColor(current) ? escapeHtml(current.toUpperCase()) : '—'}</span>
         <span class="cp-preview" style="background:${isHexColor(current) ? current : 'transparent'}"></span>
       </div>
-      <div class="help">Pick a swatch, use the color wheel, or type a hex code.</div>
+      <div class="help">Pick a swatch or use the color wheel — the hex code is filled in automatically.</div>
     </div>
   </div>`;
 }
@@ -725,25 +751,25 @@ function bindColorPicker(overlay) {
   if (!cp) return;
   const hidden = cp.querySelector('input[type="hidden"]');
   const native = cp.querySelector('.cp-native');
-  const hex = cp.querySelector('.cp-hex');
+  const hex = cp.querySelector('[data-cp-hex]');
   const preview = cp.querySelector('.cp-preview');
   const swatches = [...cp.querySelectorAll('.cp-swatch')];
   const apply = (v) => {
     const val = (v || '').trim();
     hidden.value = val;
-    hex.value = val;
     if (isHexColor(val)) {
+      hex.textContent = val.toUpperCase();
       native.value = val;
       preview.style.background = val;
       swatches.forEach((s) => s.classList.toggle('selected', s.dataset.color.toLowerCase() === val.toLowerCase()));
     } else {
+      hex.textContent = '—';
       preview.style.background = 'transparent';
       swatches.forEach((s) => s.classList.remove('selected'));
     }
   };
   swatches.forEach((s) => s.addEventListener('click', () => apply(s.dataset.color)));
   native.addEventListener('input', () => apply(native.value));
-  hex.addEventListener('input', () => apply(hex.value));
 }
 
 export function priorityFormModal({ priority, onSubmit }) {
@@ -776,17 +802,36 @@ export function priorityFormModal({ priority, onSubmit }) {
 // ---------------------------------------------------------------------------
 
 const LEVEL_LABELS = { 1: '1 — Very Low', 2: '2 — Low', 3: '3 — Medium', 4: '4 — High', 5: '5 — Very High' };
+const RISK_LEVEL_COLORS = { 1: '#16a34a', 2: '#65a30d', 3: '#eab308', 4: '#f97316', 5: '#dc2626' };
 
-export function riskFormModal({ risk, stakeholders = [], onSubmit }) {
+const RISK_LEVELS = [1, 2, 3, 4, 5].map((n) => [String(n), String(n), RISK_LEVEL_COLORS[n]]);
+
+export function riskFormModal({ risk, project, projects = [], stakeholders = [], onSubmit }) {
   const r = risk || {};
+  const lockedProject = risk ? r.project || project : project;
+  const projectField = lockedProject
+    ? staticField({ label: 'Project', value: `${lockedProject.projectCode || ''}${lockedProject.name ? ` — ${lockedProject.name}` : ''}`.trim() || '—', full: true })
+    : field({
+        name: 'projectId',
+        label: 'Project',
+        value: r.projectId || '',
+        type: 'select',
+        options: [['', 'Select project…'], ...projects.map((p) => [p.id, `${p.projectCode} — ${p.name}`])],
+        placeholder: 'Select project…',
+        required: true,
+        full: true,
+      });
   const fields = `
+    ${projectField}
     ${field({ name: 'title', label: 'Title', value: r.title, required: true, full: true })}
     ${field({ name: 'description', label: 'Description', value: r.description, type: 'textarea', rows: 2, full: true })}
-    ${field({ name: 'probability', label: 'Probability', value: r.probability || 3, type: 'select', options: [1, 2, 3, 4, 5].map((n) => [n, LEVEL_LABELS[n]]) })}
-    ${field({ name: 'impact', label: 'Impact', value: r.impact || 3, type: 'select', options: [1, 2, 3, 4, 5].map((n) => [n, LEVEL_LABELS[n]]) })}
-    ${field({ name: 'status', label: 'Status', value: r.status || 'OPEN', type: 'select', options: RISK_STATUSES })}
+    <div class="risk-levels">
+      ${pillGroup({ name: 'probability', label: 'Probability', value: r.probability !== undefined && r.probability !== null ? String(r.probability) : '', options: RISK_LEVELS, required: true, help: '1 = Very Low · 5 = Very High' })}
+      ${pillGroup({ name: 'impact', label: 'Impact', value: r.impact !== undefined && r.impact !== null ? String(r.impact) : '', options: RISK_LEVELS, required: true, help: '1 = Very Low · 5 = Very High' })}
+    </div>
+    ${pillGroup({ name: 'status', label: 'Status', value: r.status || '', options: RISK_STATUSES.map((s) => [s, s.replace('_', ' '), STATUS_COLORS[s] || '#64748b']), full: true })}
     ${field({ name: 'ownerStakeholderId', label: 'Owner', value: r.ownerStakeholderId || '', type: 'select', options: [[ '', 'None' ], ...stakeholders.map((st) => [st.id, st.name])] })}
-    ${field({ name: 'identifiedDate', label: 'Identified Date', value: toDateInput(r.identifiedDate) || new Date().toISOString().slice(0, 10), type: 'date' })}
+    ${field({ name: 'identifiedDate', label: 'Identified Date', value: toDateInput(r.identifiedDate), type: 'date' })}
     ${field({ name: 'mitigationPlan', label: 'Mitigation Plan', value: r.mitigationPlan, type: 'textarea', rows: 2, full: true })}
     ${field({ name: 'contingencyPlan', label: 'Contingency Plan', value: r.contingencyPlan, type: 'textarea', rows: 2, full: true })}
   `;
@@ -796,7 +841,7 @@ export function riskFormModal({ risk, stakeholders = [], onSubmit }) {
     submitText: risk ? 'Update' : 'Create',
     wide: true,
     onSubmit: async (values) => {
-      await onSubmit({
+      const payload = {
         title: values.title,
         description: values.description || null,
         probability: Number(values.probability),
@@ -806,7 +851,9 @@ export function riskFormModal({ risk, stakeholders = [], onSubmit }) {
         identifiedDate: values.identifiedDate || null,
         mitigationPlan: values.mitigationPlan || null,
         contingencyPlan: values.contingencyPlan || null,
-      });
+      };
+      if (!risk && values.projectId) payload.projectId = Number(values.projectId);
+      await onSubmit(payload);
     },
   });
 }

@@ -314,7 +314,7 @@ export function renderGantt(container, data, { onTaskClick, onNewTask, onResched
         : '';
 
       return `
-        <div class="gantt-row ${t.scheduleStatus === 'DELAYED' ? 'delayed' : ''} ${t.scheduleStatus === 'AT_RISK' ? 'at-risk' : ''}" style="height:${r.height}px" data-task-id="${t.id}" data-gi="${r.gi}">
+        <div class="gantt-row ${t.scheduleStatus === 'DELAYED' ? 'delayed' : ''} ${t.scheduleStatus === 'AT_RISK' ? 'at-risk' : ''}${t.overdue ? ' overdue' : ''}" style="height:${r.height}px" data-task-id="${t.id}" data-gi="${r.gi}">
           <div class="gantt-bar planned status-${t.status}" style="left:${plannedX}px;top:${BAR_PLANNED_Y}px;width:${plannedW}px" title="${escapeHtml(t.name)} — ${compactDate(t.plannedStartDate)} → ${compactDate(t.plannedEndDate)} (drag to move)"></div>
           <div class="gantt-resize" style="left:${plannedX + plannedW - 3}px;top:${BAR_PLANNED_Y}px" title="Drag to change the planned end date"></div>
           ${t.progressPercentage > 0 ? `<div class="gantt-bar progress" style="left:${plannedX}px;top:${BAR_PLANNED_Y}px;width:${progressW}px"></div>` : ''}
@@ -347,7 +347,7 @@ export function renderGantt(container, data, { onTaskClick, onNewTask, onResched
       const varNote = varianceNote(t);
       const fullTitle = `${t.taskCode} — ${escapeHtml(t.name)}\nPlanned: ${compactDate(t.plannedStartDate)} → ${compactDate(t.plannedEndDate)}${t.actualStartDate ? `\nActual: ${compactDate(t.actualStartDate)} → ${compactDate(t.actualEndDate)}` : ''}${(t.dependencies || []).length ? `\nDepends on: ${t.dependencies.map((d) => d.taskCode).join(', ')}` : ''}`;
       return `
-        <div class="gantt-row-label ${t.scheduleStatus === 'DELAYED' ? 'delayed' : ''} ${t.scheduleStatus === 'AT_RISK' ? 'at-risk' : ''}" style="height:${r.height}px;width:${labelW}px" data-task-id="${t.id}" data-gi="${r.gi}"
+        <div class="gantt-row-label ${t.scheduleStatus === 'DELAYED' ? 'delayed' : ''} ${t.scheduleStatus === 'AT_RISK' ? 'at-risk' : ''}${t.overdue ? ' overdue' : ''}" style="height:${r.height}px;width:${labelW}px" data-task-id="${t.id}" data-gi="${r.gi}"
              title="${fullTitle}" ${reorderEnabled && groupComplete(groups[r.gi]) && !(t.dependencies && t.dependencies.length) ? 'draggable="true"' : ''}>
           ${dragGlyph(t, groups[r.gi])}
           ${t.scheduleStatus !== 'ON_TRACK' ? `<span class="gantt-sched ${t.scheduleStatus.toLowerCase()}" title="${SCHEDULE_META[t.scheduleStatus].label}"><span class="badge-dot gantt-dot" style="background:${SCHEDULE_META[t.scheduleStatus].color}"></span></span>` : ''}

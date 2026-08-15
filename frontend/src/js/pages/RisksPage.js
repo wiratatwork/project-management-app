@@ -95,13 +95,14 @@ export default {
 
     const openCreate = () => {
       riskFormModal({
+        projects,
         stakeholders,
         onSubmit: async (payload) => {
-          if (!state.projectId) {
-            toast('Select a project filter first (or create the risk from the project page)', 'error');
+          if (!payload.projectId) {
+            toast('Please select a project', 'error');
             return;
           }
-          await api.post(`/api/projects/${state.projectId}/risks`, payload);
+          await api.post(`/api/projects/${payload.projectId}/risks`, payload);
           toast('Risk created');
           await table.refresh();
         },
