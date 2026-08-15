@@ -45,6 +45,10 @@ export default {
       onCount: (total) => {
         container.querySelector('#projectsCount').textContent = `${total} project(s)`;
       },
+      selectable: true,
+      onBulkDelete: (ids) => removeMany(ids),
+      confirmBulkDelete: (n) =>
+        `Delete ${n} selected project(s)? This also deletes their tasks, dependencies and risks.`,
     });
 
     const openCreate = () => {
@@ -80,6 +84,16 @@ export default {
         await table.refresh();
       } catch (err) {
         toast(err.message, 'error');
+      }
+    };
+
+    const removeMany = async (ids) => {
+      const results = await Promise.allSettled(ids.map((id) => api.del(`/api/projects/${id}`)));
+      const failed = results.filter((r) => r.status === 'rejected');
+      if (failed.length) {
+        toast(`Deleted ${ids.length - failed.length} of ${ids.length} — ${failed[0].reason?.message || 'some items could not be deleted'}`, 'error');
+      } else {
+        toast(`${ids.length} project(s) deleted`);
       }
     };
 

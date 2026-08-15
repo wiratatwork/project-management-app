@@ -70,6 +70,9 @@ export default {
         { label: 'Delete', className: 'btn-danger', onClick: (row) => remove(row) },
       ],
       emptyText: 'No risks match the filters.',
+      selectable: true,
+      onBulkDelete: (ids) => removeMany(ids),
+      confirmBulkDelete: (n) => `Delete ${n} selected risk(s)?`,
     });
 
     const openDetail = async (risk) => {
@@ -130,6 +133,16 @@ export default {
         await table.refresh();
       } catch (err) {
         toast(err.message, 'error');
+      }
+    };
+
+    const removeMany = async (ids) => {
+      const results = await Promise.allSettled(ids.map((id) => api.del(`/api/risks/${id}`)));
+      const failed = results.filter((r) => r.status === 'rejected');
+      if (failed.length) {
+        toast(`Deleted ${ids.length - failed.length} of ${ids.length} — ${failed[0].reason?.message || 'some items could not be deleted'}`, 'error');
+      } else {
+        toast(`${ids.length} risk(s) deleted`);
       }
     };
 

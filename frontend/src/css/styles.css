@@ -1315,6 +1315,28 @@ thead th.dt-drag-over { outline: 2px dashed var(--primary); outline-offset: -2px
 .dt-col-reset[hidden] { display: none; }
 .dt-col-reset i { margin-right: 4px; }
 
+/* Bulk-select checkbox column (DataTable) — fixed first column, never
+   reorderable / resizable / sortable (it has no .dt-col class). */
+.dt-bulk-delete[hidden] { display: none; }
+.dt-bulk-delete i { margin-right: 4px; }
+.data-table th.dt-check,
+.data-table td.dt-check {
+  width: 42px;
+  min-width: 42px;
+  max-width: 42px;
+  padding: 10px 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+.data-table th.dt-check { cursor: default; text-transform: none; }
+.data-table .dt-check input[type="checkbox"] {
+  accent-color: var(--primary);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
 /* Column resize handle (DataTable) */
 .dt-col-resize {
   position: absolute;

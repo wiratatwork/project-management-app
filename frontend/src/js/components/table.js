@@ -1,5 +1,5 @@
 import { escapeHtml } from '../utils.js';
-import { toast } from './ui.js';
+import { confirmDialog, toast } from './ui.js';
 import { selectHTML, mountSelects } from './select.js';
 
 const PAGE_SIZES = [10, 25, 50];
@@ -12,6 +12,11 @@ const PAGE_SIZES = [10, 25, 50];
  *          `params` is the query string built by the component (page, limit,
  *          search, sortBy, sortDir) — append any extra static params via
  *          `extraParams` (e.g. filters like projectId/status).
+ *
+ * selectable + onBulkDelete: shows a fixed checkbox column (non-reorderable,
+ * non-resizable, non-sortable) as the FIRST column, with a header select-all
+ * (current page) and a "Delete selected" toolbar button. The selection is
+ * page-scoped (cleared on every reload).
  *
  * Returns { refresh } — call it after create/edit/delete to reload the
  * current page.
@@ -29,6 +34,9 @@ export function renderDataTable(container, {
   extraParams = {},
   tableKey,
   rowClass = () => '',
+  selectable = false,
+  onBulkDelete,
+  confirmBulkDelete,
 } = {}) {
   const state = {
     page: 1,
@@ -41,6 +49,8 @@ export function renderDataTable(container, {
     total: 0,
     totalPages: 1,
   };
+
+  const selected = new Set(); // ids ticked for bulk delete (page-scoped)
 
   let seq = 0; // guards against out-of-order responses
 
@@ -116,6 +126,15 @@ export function renderDataTable(container, {
 
   // --- Rendering -----------------------------------------------------------
 
+  // Fixed checkbox column: first column, never draggable / resizable / sortable
+  // (it has no `dt-col` class, no resize handle and no `data-sort`).
+  const checkboxThHtml = () =>
+    `<th class="dt-check" aria-label="Select rows">
+      <input type="checkbox" data-dt-select-all title="Select all on this page" />
+    </th>`;
+  const checkboxTdHtml = (row) =>
+    `<td class="dt-check"><input type="checkbox" data-dt-row="${row.id}" ${selected.has(row.id) ? 'checked' : ''} aria-label="Select row" /></td>`;
+
   const thFor = (col) => {
     const sortable = col.sortable !== false && sortKeyOf(col);
     const active = sortable && state.sortBy === sortKeyOf(col);
@@ -131,21 +150,21 @@ export function renderDataTable(container, {
   };
 
   const emptyRow = (message) =>
-    `<tr class="empty-row"><td colspan="${cols.length + (actions.length ? 1 : 0)}">${escapeHtml(message)}</td></tr>`;
+    `<tr class="empty-row"><td colspan="${cols.length + (actions.length ? 1 : 0) + (selectable ? 1 : 0)}">${escapeHtml(message)}</td></tr>`;
 
   const rowsHtml = () => {
     if (state.loading) return emptyRow('Loading…');
     if (state.rows.length === 0) return emptyRow(emptyText);
     return state.rows
       .map((row) => {
-        const tds = cols
+        const tds = `${selectable ? checkboxTdHtml(row) : ''}${cols
           .map((c) => {
             const styles = [];
             if (c.align) styles.push(`text-align:${c.align}`);
             if (colWidths[c.key]) styles.push(`min-width:${colWidths[c.key]}px`);
             return `<td${styles.length ? ` style="${styles.join(';')}"` : ''}>${c.render ? c.render(row) : escapeHtml(row[c.key] ?? '—')}</td>`;
           })
-          .join('');
+          .join('')}`;
         const actionTds = actions.length
           ? `<td class="cell-actions">${actions
               .map((a) => `<button class="btn btn-sm ${a.className || 'btn-secondary'}" data-act="${escapeHtml(a.label)}">${escapeHtml(a.label)}</button>`)
@@ -190,6 +209,7 @@ export function renderDataTable(container, {
           <input type="text" placeholder="Search…" data-dt-search autocomplete="off" />
         </div>` : '<span></span>'}
       <div class="dt-toolbar-end">
+        ${selectable && onBulkDelete ? `<button type="button" class="btn btn-sm btn-danger dt-bulk-delete" data-dt-bulk-delete hidden><i class="bi bi-trash"></i> <span data-dt-bulk-count>Delete selected</span></button>` : ''}
         <button type="button" class="btn btn-sm btn-secondary dt-col-reset" data-dt-col-reset hidden title="Restore the default column order"><i class="bi bi-arrow-counterclockwise"></i> Reset columns</button>
         <div class="dt-pagesize">
           <span>Show</span>
@@ -199,7 +219,7 @@ export function renderDataTable(container, {
       </div>
     </div>
     <div class="table-wrap"><table class="data-table">
-      <thead><tr>${cols.map(thFor).join('')}${actions.length ? '<th class="cell-actions">Actions</th>' : ''}</tr></thead>
+      <thead><tr>${selectable ? checkboxThHtml() : ''}${cols.map(thFor).join('')}${actions.length ? '<th class="cell-actions">Actions</th>' : ''}</tr></thead>
       <tbody data-dt-body>${rowsHtml()}</tbody>
     </table></div>
     <div class="dt-footer">
@@ -222,6 +242,7 @@ export function renderDataTable(container, {
 
   const load = async () => {
     const id = ++seq;
+    selected.clear(); // selection is page-scoped — reset on every reload
     state.loading = true;
     body.innerHTML = rowsHtml();
     try {
@@ -248,6 +269,7 @@ export function renderDataTable(container, {
         container.querySelector('.dt-pager').innerHTML = pagerHtml();
         bindPager();
         bindRows();
+        syncSelection();
       }
     }
   };
@@ -258,6 +280,7 @@ export function renderDataTable(container, {
     container.querySelectorAll('tbody tr.clickable').forEach((tr) => {
       tr.addEventListener('click', (e) => {
         if (e.target.closest('button')) return;
+        if (e.target.closest('input')) return; // checkbox toggles, don't navigate
         const row = state.rows.find((r) => r.id === Number(tr.dataset.id));
         if (row) onRowClick(row);
       });
@@ -361,7 +384,10 @@ export function renderDataTable(container, {
         if (colIdx < 0) return;
         const startX = e.clientX;
         const startW = th.getBoundingClientRect().width;
-        const cells = [...container.querySelectorAll('tbody tr')].map((tr) => tr.children[colIdx]).filter(Boolean);
+        // The fixed checkbox column (when selectable) shifts every body cell
+        // one slot to the right of the header column index.
+        const cellOffset = selectable ? 1 : 0;
+        const cells = [...container.querySelectorAll('tbody tr')].map((tr) => tr.children[colIdx + cellOffset]).filter(Boolean);
         const applyW = (w) => {
           const cw = Math.round(Math.max(60, Math.min(w, 700)));
           th.style.minWidth = `${cw}px`;
@@ -390,10 +416,70 @@ export function renderDataTable(container, {
 
   // Re-render the header row (keeps sort arrows + drag/reorder/resize in sync).
   const renderHeader = () => {
-    head.innerHTML = cols.map(thFor).join('') + (actions.length ? '<th class="cell-actions">Actions</th>' : '');
+    head.innerHTML = (selectable ? checkboxThHtml() : '') + cols.map(thFor).join('') + (actions.length ? '<th class="cell-actions">Actions</th>' : '');
     bindSortHeaders();
     bindHeaderDrag();
     bindColResize();
+    syncSelection();
+  };
+
+  // Keep the select-all checkbox + bulk-delete button in sync with `selected`.
+  const syncSelection = () => {
+    if (!selectable) return;
+    const all = container.querySelector('[data-dt-select-all]');
+    if (all) {
+      const pageIds = state.rows.map((r) => r.id);
+      const onPage = pageIds.filter((id) => selected.has(id)).length;
+      all.checked = pageIds.length > 0 && onPage === pageIds.length;
+      all.indeterminate = onPage > 0 && onPage < pageIds.length;
+    }
+    const btn = container.querySelector('[data-dt-bulk-delete]');
+    if (btn) {
+      btn.hidden = selected.size === 0;
+      const label = btn.querySelector('[data-dt-bulk-count]');
+      if (label) label.textContent = `Delete selected (${selected.size})`;
+    }
+  };
+
+  // Row checkboxes + select-all + bulk delete (delegated, so re-renders are fine).
+  const bindSelection = () => {
+    if (!selectable) return;
+    container.addEventListener('change', (e) => {
+      const rowBox = e.target.closest('[data-dt-row]');
+      if (rowBox) {
+        const id = Number(rowBox.dataset.dtRow);
+        if (rowBox.checked) selected.add(id);
+        else selected.delete(id);
+        syncSelection();
+        return;
+      }
+      if (e.target.matches('[data-dt-select-all]')) {
+        const pageIds = state.rows.map((r) => r.id);
+        if (e.target.checked) pageIds.forEach((id) => selected.add(id));
+        else pageIds.forEach((id) => selected.delete(id));
+        container.querySelectorAll('[data-dt-row]').forEach((cb) => {
+          cb.checked = e.target.checked;
+        });
+        syncSelection();
+      }
+    });
+    container.querySelector('[data-dt-bulk-delete]')?.addEventListener('click', async () => {
+      const ids = [...selected];
+      if (!ids.length || typeof onBulkDelete !== 'function') return;
+      const msg = typeof confirmBulkDelete === 'function' ? confirmBulkDelete(ids.length) : confirmBulkDelete;
+      const ok = await confirmDialog(msg || `Delete ${ids.length} selected item(s)?`);
+      if (!ok) return;
+      try {
+        await onBulkDelete(ids);
+      } catch (err) {
+        toast(err.message, 'error');
+      } finally {
+        selected.clear();
+        // The page may have re-rendered (detached container) — only refresh
+        // when this table instance is still on screen.
+        if (container.isConnected) await load();
+      }
+    });
   };
 
   const bindSortHeaders = () => {
@@ -415,6 +501,8 @@ export function renderDataTable(container, {
     });
   };
   renderHeader();
+
+  bindSelection();
 
   resetColsBtn?.addEventListener('click', () => {
     cols = [...columns];

@@ -241,6 +241,9 @@ export default {
         onCount: (total) => {
           content.querySelector('#taskCountLabel').textContent = `${total} task(s)`;
         },
+        selectable: true,
+        onBulkDelete: (ids) => removeManyTasks(ids),
+        confirmBulkDelete: (n) => `Delete ${n} selected task(s)?`,
       });
 
       const openTaskDetail = async (taskId) => {
@@ -301,6 +304,17 @@ export default {
         } catch (err) {
           toast(err.message, 'error');
         }
+      };
+
+      const removeManyTasks = async (ids) => {
+        const results = await Promise.allSettled(ids.map((id) => api.del(`/api/tasks/${id}`)));
+        const failed = results.filter((r) => r.status === 'rejected');
+        if (failed.length) {
+          toast(`Deleted ${ids.length - failed.length} of ${ids.length} — ${failed[0].reason?.message || 'some items could not be deleted'}`, 'error');
+        } else {
+          toast(`${ids.length} task(s) deleted`);
+        }
+        reloadProject();
       };
 
       content.querySelector('#newTaskBtn').addEventListener('click', openCreateTask);
@@ -558,6 +572,9 @@ export default {
         onCount: (total) => {
           content.querySelector('#riskCountLabel').textContent = `${total} risk(s)`;
         },
+        selectable: true,
+        onBulkDelete: (ids) => removeManyRisks(ids),
+        confirmBulkDelete: (n) => `Delete ${n} selected risk(s)?`,
       });
 
       const openRiskDetail = async (risk) => {
@@ -616,6 +633,18 @@ export default {
         } catch (err) {
           toast(err.message, 'error');
         }
+      };
+
+      const removeManyRisks = async (ids) => {
+        const results = await Promise.allSettled(ids.map((id) => api.del(`/api/risks/${id}`)));
+        const failed = results.filter((r) => r.status === 'rejected');
+        if (failed.length) {
+          toast(`Deleted ${ids.length - failed.length} of ${ids.length} — ${failed[0].reason?.message || 'some items could not be deleted'}`, 'error');
+        } else {
+          toast(`${ids.length} risk(s) deleted`);
+        }
+        renderRisksTab(content);
+        reloadProject();
       };
 
       content.querySelector('#newRiskBtn').addEventListener('click', openCreateRisk);

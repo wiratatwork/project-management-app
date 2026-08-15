@@ -28,6 +28,9 @@ export default {
         { label: 'Delete', className: 'btn-danger', onClick: (row) => remove(row) },
       ],
       emptyText: 'No priorities defined.',
+      selectable: true,
+      onBulkDelete: (ids) => removeMany(ids),
+      confirmBulkDelete: (n) => `Delete ${n} selected priorit${n === 1 ? 'y' : 'ies'}?`,
     });
 
     const prioritySwatch = (p) => `
@@ -69,6 +72,16 @@ export default {
         await table.refresh();
       } catch (err) {
         toast(err.message, 'error');
+      }
+    };
+
+    const removeMany = async (ids) => {
+      const results = await Promise.allSettled(ids.map((id) => api.del(`/api/priorities/${id}`)));
+      const failed = results.filter((r) => r.status === 'rejected');
+      if (failed.length) {
+        toast(`Deleted ${ids.length - failed.length} of ${ids.length} — ${failed[0].reason?.message || 'some items could not be deleted'}`, 'error');
+      } else {
+        toast(`${ids.length} priorit${ids.length === 1 ? 'y' : 'ies'} deleted`);
       }
     };
 
