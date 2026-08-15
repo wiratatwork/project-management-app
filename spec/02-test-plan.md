@@ -24,6 +24,17 @@ npm install   # ครั้งแรก (vitest + jsdom)
 npm test      # vitest run — 5 ไฟล์ / 44 เทสต์ (table, gantt, avatars, ganttFilter, router)
 ```
 
+## 1.1 CI — GitHub Actions (อัตโนมัติทุก push)
+
+`.github/workflows/ci.yml` รันอัตโนมัติทุก push / pull request (3 jobs รันขนานกัน):
+
+- **backend-tests** — `docker compose up -d postgres` → `npm ci` → `npx prisma generate` → `npm test`
+- **frontend-tests** — `npm ci` → `npm test` (vitest + jsdom, ไม่ต้อง Docker)
+- **docker-build** — `docker compose build` (backend + frontend) แล้ว smoke test: up ทั้ง stack,
+  curl `/api/health` ผ่าน backend (`:3000`) และ nginx (`:8080`) แล้ว `docker compose down -v`
+
+> กติกาเดียวกับ spec: commit ที่ทำให้ CI แดง ต้องแก้ก่อน merge
+
 ## 2. โครงสร้างชุดเทสต์
 
 ```

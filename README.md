@@ -4,6 +4,7 @@ A complete, Dockerized **Project Management System** with a working frontend, RE
 PostgreSQL database, Gantt charts, dashboards and full CRUD — not a prototype.
 
 ![Stack](https://img.shields.io/badge/stack-Node.js%20%7C%20Express%20%7C%20Prisma%20%7C%20PostgreSQL%20%7C%20Docker-blue)
+[![CI](https://github.com/wiratatwork/project-management-app/actions/workflows/ci.yml/badge.svg)](https://github.com/wiratatwork/project-management-app/actions/workflows/ci.yml)
 
 ---
 

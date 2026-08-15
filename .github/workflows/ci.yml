@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-tests:
+    name: Backend tests (Vitest + Supertest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # The test suite needs a running postgres: `npm test` prepares the
+      # dedicated test DB (project_management_test) via docker compose exec.
+      - name: Start PostgreSQL (docker compose)
+        run: docker compose up -d postgres
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T postgres pg_isready -U pm_user -d project_management >/dev/null 2>&1; then
+              echo "PostgreSQL is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "PostgreSQL did not become ready"
+          docker compose logs postgres
+          exit 1
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Run backend tests
+        working-directory: backend
+        run: npm test
+
+  frontend-tests:
+    name: Frontend tests (Vitest + jsdom)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test
+
+  docker-build:
+    name: Docker build + smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker images (backend + frontend)
+        run: docker compose build
+
+      - name: Start the full stack
+        run: docker compose up -d
+
+      - name: Smoke test — backend health
+        run: |
+          ok=""
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/api/health >/dev/null 2>&1; then ok=1; break; fi
+            sleep 2
+          done
+          if [ -z "$ok" ]; then
+            echo "Backend did not become healthy"
+            docker compose logs backend
+            exit 1
+          fi
+          echo "Backend healthy: $(curl -sf http://localhost:3000/api/health)"
+
+      - name: Smoke test — frontend (nginx proxy to /api)
+        run: |
+          ok=""
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/api/health >/dev/null 2>&1; then ok=1; break; fi
+            sleep 2
+          done
+          if [ -z "$ok" ]; then
+            echo "Frontend did not come up"
+            docker compose logs frontend backend
+            exit 1
+          fi
+          echo "Frontend OK: $(curl -sf http://localhost:8080/api/health)"
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
