@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 
-// Ensure DB + env are configured before the app is imported.
-process.env.DATABASE_URL =
-  process.env.DATABASE_URL || 'postgresql://pm_user:pm_password@localhost:5432/project_management';
-process.env.NODE_ENV = process.env.NODE_ENV || 'test';
+// Tests always run against the dedicated test database (never the real one,
+// even if DATABASE_URL is set in the shell or backend/.env).
+// Run `npm run db:test:prepare` (part of `npm test`) to create/migrate/seed it.
+const { getTestDatabaseUrl } = await import('../../scripts/testDb.js');
+process.env.DATABASE_URL = getTestDatabaseUrl();
+process.env.NODE_ENV = 'test';
 
 const { default: app } = await import('../../src/app.js');
 

@@ -13,8 +13,10 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
     "db:generate": "prisma generate",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "db:test:prepare": "node scripts/prepare-test-db.js",
+    "test": "npm run db:test:prepare && vitest run",
+    "test:watch": "npm run db:test:prepare && vitest",
+    "test:coverage": "npm run db:test:prepare && vitest run --coverage"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -32,6 +34,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
     "pino-pretty": "^13.0.0",
     "prisma": "^5.22.0",
     "supertest": "^7.0.0",
