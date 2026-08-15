@@ -15,5 +15,5 @@ RUN npx prisma generate
 
 EXPOSE 3000
 
-# Entrypoint applies migrations, seeds demo data, then starts the API
+# Entrypoint applies migrations, conditionally seeds demo data, then starts the API
 CMD ["sh", "docker-entrypoint.sh"]

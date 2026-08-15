@@ -33,6 +33,9 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Seed demo data on startup: unset = only when the DB is empty,
+      # "true" = always, "false" = never. See backend/docker-entrypoint.sh.
+      SEED_ON_START: ${SEED_ON_START:-}
       TZ: UTC
     depends_on:
       postgres:
