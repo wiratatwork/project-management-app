@@ -1,0 +1,14 @@
+{
+  "name": "projectflow-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ProjectFlow frontend — static ES modules served by nginx (no build step); tests run with vitest + jsdom",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0",
+    "vitest": "^2.1.9"
+  }
+}
